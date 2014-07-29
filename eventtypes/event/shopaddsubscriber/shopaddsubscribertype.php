@@ -90,7 +90,7 @@ class ShopAddSubscriberType extends eZWorkflowEventType {
             }
         }
 
-        if( in_array( 'phil&tedsproductsIown', $fields ) ) {
+        if( array_key_exists( 'productsIown', $fields ) ) {
             $productSKUs  = array();
             $productItems = $order->attribute( 'product_items' );
             foreach( $productItems as $item ) {
@@ -122,7 +122,7 @@ class ShopAddSubscriberType extends eZWorkflowEventType {
             }
 
             $subscriber['CustomFields'][] = array(
-                'Key'   => 'phil&tedsproductsIown',
+                'Key'   => $fields['productsIown'],
                 'Value' => implode( ',', $productSKUs )
             );
         }
