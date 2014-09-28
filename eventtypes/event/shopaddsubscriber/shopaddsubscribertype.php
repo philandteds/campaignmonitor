@@ -97,7 +97,7 @@ class ShopAddSubscriberType extends eZWorkflowEventType {
                 );
             }
         }
-        var_dump( $subscriber ); exit();
+
         if( array_key_exists( 'productsIown', $fields ) ) {
             $productSKUs  = array();
             $productItems = $order->attribute( 'product_items' );
