@@ -83,13 +83,21 @@ class ShopAddSubscriberType extends eZWorkflowEventType {
         }
         foreach( $fields as $customField => $accountInfoField ) {
             if( isset( $accountInfo->{$accountInfoField} ) ) {
+                $value = (string) $accountInfo->{$accountInfoField};
+                if( $customField === 'Country' ) {
+                    $country = eZCountryType::fetchCountry( $value, 'Alpha3' );
+                    if( is_array( $country ) && isset( $country['Name'] ) ) {
+                        $value = $country['Name'];
+                    }
+                }
+
                 $subscriber['CustomFields'][] = array(
                     'Key'   => $customField,
-                    'Value' => (string) $accountInfo->{$accountInfoField}
+                    'Value' => $value
                 );
             }
         }
-
+        var_dump( $subscriber ); exit();
         if( array_key_exists( 'productsIown', $fields ) ) {
             $productSKUs  = array();
             $productItems = $order->attribute( 'product_items' );
