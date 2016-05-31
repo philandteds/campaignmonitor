@@ -1,9 +1,13 @@
 <?php /* #?ini charset="utf-8"?
 
 [CronjobSettings]
-ScriptDirectories[]=extension/ax_import/cronjobs
-Scripts[]=remove_expired_ax_import_logs.php
+ScriptDirectories[]=extension/campaign_monitor/cronjobs
+Scripts[]=abandonedcartemail.php
 
-[CronjobPart-frequent]
-Scripts[]=remove_expired_ax_import_logs.php
+[CronjobPart-infrequent]
+Scripts[]=abandonedcartemail.php
+
+[CronjobPart-test]
+Scripts[]=abandonedcartemail.php
+
 */ ?>
