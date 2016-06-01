@@ -5,11 +5,22 @@
  * For each order, send an email through Campaign Monitor.
  */
 
-DEFINE ('SECONDS_IN_DAY', 60*60*24);
+define ('EMAIL_TEMPLATE_NAME', 'design:shop/orderemail/html/abandoned_cart.tpl');
+define ('CAMPAIGN_MONITOR_GROUP', 'Abandoned Cart');
+define ('SECONDS_IN_DAY', 60*60*24);
+
+$cli = eZCLI::instance();
+if (!$cli->isQuiet()) {
+    $cli->notice("Starting Abandoned Cart Email Processing");
+}
 
 $ini = eZINI::instance('campaign_monitor.ini');
 $dateRangeStart = $ini->variable('AbandonedCartEmail', 'DateRangeStartDays');
 $dateRangeEnd = $ini->variable('AbandonedCartEmail', 'DateRangeEndDays');
+$sender = $ini->variable('AbandonedCartEmail', 'EmailSender');
+$subject = $ini->variable('AbandonedCartEmail', 'EmailSubject');
+$apiKey = $ini->variable('General', 'APIKey');
+$clientId = $ini->variable('General', 'ClientID');
 
 // default values
 if (!$dateRangeStart)
@@ -17,22 +28,16 @@ if (!$dateRangeStart)
 if (!$dateRangeEnd)
     $dateRangeEnd = 1;
 
-
-$cli = eZCLI::instance();
-if (!$cli->isQuiet()) {
-    $cli->notice("Starting Abandoned Cart Email Processing");
-}
-
 $fromDate = time() - ($dateRangeStart * SECONDS_IN_DAY);
 $toDate = time() - ($dateRangeEnd * SECONDS_IN_DAY);
 
-$db = eZDB::instance();
 
-$abandonedCarts = identifyAbandonedCarts($db, $fromDate, $toDate);
+$abandonedCarts = identifyAbandonedCarts($fromDate, $toDate, $subject);
+foreach ($abandonedCarts as $email => $orderId) {
+    $cli->notice("Abandoned cart detected: $email. Latest Order: $orderId");
 
-// we've passed through the data. Anything left in the $candidateCarts array is fair game
-foreach ($abandonedCarts as $cartEmail) {
-    $cli->notice("Abandoned cart detected: $cartEmail");
+    //sendAbandonedCartEmail("mark@clearfield.com", false, $sender, $subject, $apiKey, $clientId, $cli);
+    logAbandonedCartEmailSend($email, $sender, $subject, true);
 }
 
 if (!$cli->isQuiet()) {
@@ -49,19 +54,29 @@ if (!$cli->isQuiet()) {
  * carts, adding those that are temporary and removing those that are not. The dataset is sorted so that non-temporary carts
  * always come after temporary ones.
  *
- * @param $db Database instance
- * @param $fromDate long start of date range to check for abandoned carts (ie the earliest date/time)
- * @param $toDate long end of date range to check for abandoned carts (ie the latest date/time)
- * @return array List of the email addresses with abandoned carts
+ * Any carts that already have an abandoned cart email entry in mail_logs are not considered.
+ *
+ * @param $fromDate integer start of date range to check for abandoned carts (ie the earliest date/time)
+ * @param $toDate integer end of date range to check for abandoned carts (ie the latest date/time)
+ * @param $emailSubject string the Subject message to look for in the mail_logs table
+ * @return array Map of the email addresses with abandoned carts & their order numbers (email address is the key, order number is the value)
  */
-function identifyAbandonedCarts($db, $fromDate, $toDate) {
+function identifyAbandonedCarts($fromDate, $toDate, $emailSubject) {
+    $db = eZDB::instance();
+
+    $encodedSubject = $db->escapeString($emailSubject);
+
     $sql = "
-    select max(created) as created, is_temporary, substring(data_text_1, locate('<email>', data_text_1) + length('<email>'), 
-                 locate('</email>', data_text_1)-locate('<email>', data_text_1)-length('<email>')) as email
-    from ezorder
-    where created > $fromDate
-    group by is_temporary, email
-    order by email, is_temporary desc
+        select created, orderId, is_temporary, email
+        from (
+            select max(created) as created, max(id) as orderId, is_temporary, substring(data_text_1, locate('<email>', data_text_1) + length('<email>'), 
+                            locate('</email>', data_text_1)-locate('<email>', data_text_1)-length('<email>')) as email
+            from ezorder
+            where created > $fromDate
+            group by is_temporary, email
+        ) as carts
+        where not exists (select 1 from mail_logs where  receivers=email and created > $fromDate and subject like '$encodedSubject')
+        order by email, is_temporary desc
 ";
 
     $rows = $db->arrayQuery($sql);
@@ -71,23 +86,97 @@ function identifyAbandonedCarts($db, $fromDate, $toDate) {
         $is_temporary = $row['is_temporary'];
         $created = $row['created'];
         $email = strtolower($row['email']);
+        $orderId = strtolower($row['orderId']);
 
         if ($is_temporary == 1 && $created > $fromDate && $created <= $toDate) {
-            $candidateCarts[$email] = 1;
+            $candidateCarts[$email] = $orderId;
         } else if ($is_temporary == 0) {
             unset($candidateCarts[$email]);
         }
     }
 
     // we've passed through the data. Anything left in the $candidateCarts array is fair game
-    return array_keys($candidateCarts);
+    return $candidateCarts;
 }
 
 /**
  * Sends the abandoned cart email through the Campaign Monitor interface
  *
  * @param $email String the recipient of the email
+ * @param $orderId integer the order ID to pass to the template (as the "order" variable)
+ * @param $sender String the email address of the email sender
+ * @param $subject
+ * @param $apiKey String the Campaign Monitor API key (for auth)
+ * @param $clientId String the Campaign Monitor Client ID (for auth)
+ * @param $cli eZCLI the CLI session (for logging)
+ * @return bool true on success, false on failure.
  */
-function sendAbandonedCartEmail($email) {
+function sendAbandonedCartEmail($email, $orderId, $sender, $subject, $apiKey, $clientId, $cli) {
+
+    $tpl = eZTemplate::factory();
+
+    if ($orderId) {
+        $order = eZOrder::fetch( $orderId );
+        $tpl->setVariable( "order", $order );
+    }
+
+    $html = $tpl->fetch(EMAIL_TEMPLATE_NAME);
+
+    if (!$html) {
+        $cli->notice("Error when rendering " . EMAIL_TEMPLATE_NAME . " . for email: $email. order ID: $orderId");
+        return false;
+    }
+
+    if (!$cli->isQuiet()) {
+        $cli->notice("Sending Abandoned Cart Email to $email. Order ID: $orderId");
+    }
+
+
+    $message = array(
+        'From' => $sender,
+        'ReplyTo' => null,
+        'To' => array(
+            $email
+        ),
+        'CC' => null,
+        'BCC' => null,
+        'Subject' => $subject,
+        'Html' => $html,
+        'Text' => null, // let campaign monitor autogenerate the text part from the HTML
+        'Attachments' => null
+    );
+
+    // send
+    $campaignMonitorAPI = new CS_REST_Transactional_ClassicEmail($apiKey);
+    $campaignMonitorAPI->set_client($clientId);
+    $response = $campaignMonitorAPI->send($message, CAMPAIGN_MONITOR_GROUP);
+
+    if (!$cli->isQuiet()) {
+        $formattedResponse = print_r($response, true);
+        $cli->notice("Response: $formattedResponse");
+    }
+
+    return $response->http_status_code == 200;
+}
+
+
+/**
+ * Records this send in the mail_log table,
+ *
+ * @param $email string Email recipient
+ * @param $sender string Email sender
+ * @param $subject string Email subject
+ * @param $success boolean Did campaign monitor return a 200 success?
+ */
+function logAbandonedCartEmailSend($email, $sender, $subject, $success) {
     
+    $logRecord = new MailLogItem(array(
+        'date' => time(),
+        'subject' => $subject,
+        'receivers' => $email,
+        'is_sent' => 1,
+        'error' => $success ? null : "1",
+        'sender' => $sender));
+
+    $logRecord->store();
 }

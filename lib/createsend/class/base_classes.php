@@ -125,6 +125,7 @@ class CS_REST_Wrapper_Base {
      * @param $log CS_REST_Log The logger to use. Used for dependency injection
      * @param $serialiser The serialiser to use. Used for dependency injection
      * @param $transport The transport to use. Used for dependency injection
+     * @param $apiVersion The version of the API to embed in the URL. Defaults to v3
      * @access public
      */
     function CS_REST_Wrapper_Base(
@@ -134,7 +135,8 @@ class CS_REST_Wrapper_Base {
         $host = CS_HOST,
         $log = NULL,
         $serialiser = NULL,
-        $transport = NULL) {
+        $transport = NULL,
+        $apiVersion = "v3") {
 
         if (is_string($auth_details)) {
             # If $auth_details is a string, assume it is an API key
@@ -144,7 +146,7 @@ class CS_REST_Wrapper_Base {
         $this->_log = is_null($log) ? new CS_REST_Log($debug_level) : $log;
 
         $this->_protocol = $protocol;
-        $this->_base_route = $protocol.'://'.$host.'/api/v3/';
+        $this->_base_route = $protocol.'://'.$host.'/api/' . $apiVersion .'/';
 
         $this->_log->log_message('Creating wrapper for '.$this->_base_route, get_class($this), CS_REST_LOG_VERBOSE);
 
