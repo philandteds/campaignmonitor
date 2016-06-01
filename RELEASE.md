@@ -4,7 +4,7 @@ Abandoned Cart Emails
 Overview
 --------
 
-"Abandoned Cart Emails" is a cronjob that does the following:
+**Abandoned Cart Emails** is a cronjob that does the following:
 
 * Looks in the eZOrder table for shopping carts that have never been finalized.
 * Checks to see if a user has already been emailed about their abandoned cart.
@@ -26,7 +26,10 @@ The following parameters have been added to campaign_monitor.ini.append.php
 
 	# subject line of the abandoned cart email
 	EmailSubject=We'd love to have you back!
-</pre>
+
+	# email sender (make sure this user is allowed in Campaign Monitor)
+	EmailSender=no_reply@mountainbuggy.com
+
 
 The date range is used to control the 'window' of time that we look back for
 dangling shopping carts. In the default settings above, we check for shopping
@@ -57,13 +60,12 @@ The mail template is defined in
     design:shop/orderemail/html/abandoned_cart.tpl
 
 The default mail template is just a boring placeholder. Feel free to override
-it in the appropriate siteaccess.
-
-    One parameter is passed in:
+it in the appropriate siteaccess. One parameter is passed in:
 
       order => (eZOrder)
 
-To test the layout of the mail template, you can use a new view for this purpose:
+To test the layout of the mail template, you can use a new view built for this
+purpose:
 
 http://dev.mountainbuggy.com/mb_global/campaign_monitor/preview_abandoned_cart_email/(OrderID)/2
 

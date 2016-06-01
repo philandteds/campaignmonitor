@@ -31,12 +31,11 @@ if (!$dateRangeEnd)
 $fromDate = time() - ($dateRangeStart * SECONDS_IN_DAY);
 $toDate = time() - ($dateRangeEnd * SECONDS_IN_DAY);
 
-
 $abandonedCarts = identifyAbandonedCarts($fromDate, $toDate, $subject);
 foreach ($abandonedCarts as $email => $orderId) {
     $cli->notice("Abandoned cart detected: $email. Latest Order: $orderId");
 
-    //sendAbandonedCartEmail("mark@clearfield.com", false, $sender, $subject, $apiKey, $clientId, $cli);
+    sendAbandonedCartEmail($email, $orderId, $sender, $subject, $apiKey, $clientId, $cli);
     logAbandonedCartEmailSend($email, $sender, $subject, true);
 }
 
@@ -105,7 +104,7 @@ function identifyAbandonedCarts($fromDate, $toDate, $emailSubject) {
  * @param $email String the recipient of the email
  * @param $orderId integer the order ID to pass to the template (as the "order" variable)
  * @param $sender String the email address of the email sender
- * @param $subject
+ * @param $subject String email subject line
  * @param $apiKey String the Campaign Monitor API key (for auth)
  * @param $clientId String the Campaign Monitor Client ID (for auth)
  * @param $cli eZCLI the CLI session (for logging)
@@ -156,17 +155,17 @@ function sendAbandonedCartEmail($email, $orderId, $sender, $subject, $apiKey, $c
         $cli->notice("Response: $formattedResponse");
     }
 
-    return $response->http_status_code == 200;
+    return $response->http_status_code >= 200 && $response->http_status_code < 300;
 }
 
 
 /**
- * Records this send in the mail_log table,
+ * Records this send in the mail_log table.
  *
  * @param $email string Email recipient
  * @param $sender string Email sender
  * @param $subject string Email subject
- * @param $success boolean Did campaign monitor return a 200 success?
+ * @param $success boolean Did campaign monitor return a  code in the 200 success range?
  */
 function logAbandonedCartEmailSend($email, $sender, $subject, $success) {
     
