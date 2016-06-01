@@ -47,7 +47,7 @@ belongs is defined in the [CronjobPart-test] part. To determine this, check in
     php runcronjobs.php -s mb_global test
 
 **Be careful if you're using a database with real email addresses! Those users
-will receive emails**
+will receive emails.**
 
 Overriding the Mail template
 ----------------------------
@@ -68,9 +68,9 @@ To test the layout of the mail template, you can use a new view for this purpose
 http://dev.mountainbuggy.com/mb_global/campaign_monitor/preview_abandoned_cart_email/(OrderID)/2
 
 Note that you may see nothing if there is no email template for the siteaccess
- (in my case, I've added the campaign_monitor design to the mb_global siteaccess
-[AdditionalSiteDesigns] list in site.ini, which lets me load the default
-mail template. You may or may not want to do that)
+(in my case, I've added the campaign_monitor design to the mb_global siteaccess
+[AdditionalSiteDesigns] list, which lets me load the default mail template.
+You may or may not want to do that.)
 
 Note that you'll need to grant permissions before you can see the view
 mentioned above.
