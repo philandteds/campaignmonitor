@@ -44,7 +44,7 @@ Testing the cronjob
 --------------------
 
 The following command may be used to test the cronjob (assuming the cronjob
-belongs is defined in the [CronjobPart-test] part. To determine this, check in
+is defined in the [CronjobPart-test] part. To determine this, check in
 /extension/campaign_monitor/settings/cronjob.ini.append.php
 
     php runcronjobs.php -s mb_global test
