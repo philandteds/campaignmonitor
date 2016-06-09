@@ -1,3 +1,4 @@
+{set-block scope=root variable=subject}{"Abandoned Shopping Cart"|i18n}{/set-block}
 <html>
     <title>Abandoned Cart</title>
     <body>

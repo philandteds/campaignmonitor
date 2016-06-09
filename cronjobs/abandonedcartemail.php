@@ -18,9 +18,11 @@ $ini = eZINI::instance('campaign_monitor.ini');
 $dateRangeStart = $ini->variable('AbandonedCartEmail', 'DateRangeStartDays');
 $dateRangeEnd = $ini->variable('AbandonedCartEmail', 'DateRangeEndDays');
 $sender = $ini->variable('AbandonedCartEmail', 'EmailSender');
-$subject = $ini->variable('AbandonedCartEmail', 'EmailSubject');
 $apiKey = $ini->variable('General', 'APIKey');
 $clientId = $ini->variable('General', 'ClientID');
+
+$subject = 'Abandoned Cart';
+
 
 // default values
 if (!$dateRangeStart)
@@ -120,6 +122,11 @@ function sendAbandonedCartEmail($email, $orderId, $sender, $subject, $apiKey, $c
     }
 
     $html = $tpl->fetch(EMAIL_TEMPLATE_NAME);
+
+    if ($tpl->hasVariable("subject")) {
+        $subject = $tpl->variable("subject");
+    }
+
 
     if (!$html) {
         $cli->notice("Error when rendering " . EMAIL_TEMPLATE_NAME . " . for email: $email. order ID: $orderId");
