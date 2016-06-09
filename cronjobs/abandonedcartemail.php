@@ -22,6 +22,7 @@ $apiKey = $ini->variable('General', 'APIKey');
 $clientId = $ini->variable('General', 'ClientID');
 
 $subject = 'Abandoned Cart';
+$siteAccess = $script->SiteAccess;
 
 
 // default values
@@ -33,7 +34,7 @@ if (!$dateRangeEnd)
 $fromDate = time() - ($dateRangeStart * SECONDS_IN_DAY);
 $toDate = time() - ($dateRangeEnd * SECONDS_IN_DAY);
 
-$abandonedCarts = identifyAbandonedCarts($fromDate, $toDate, $subject);
+$abandonedCarts = identifyAbandonedCarts($fromDate, $toDate, $subject, $siteAccess);
 foreach ($abandonedCarts as $email => $orderId) {
     $cli->notice("Abandoned cart detected: $email. Latest Order: $orderId");
 
@@ -62,10 +63,11 @@ if (!$cli->isQuiet()) {
  * @param $emailSubject string the Subject message to look for in the mail_logs table
  * @return array Map of the email addresses with abandoned carts & their order numbers (email address is the key, order number is the value)
  */
-function identifyAbandonedCarts($fromDate, $toDate, $emailSubject) {
+function identifyAbandonedCarts($fromDate, $toDate, $emailSubject, $siteAccess) {
     $db = eZDB::instance();
 
     $encodedSubject = $db->escapeString($emailSubject);
+    $encodedSiteAccess = $db->escapeString($siteAccess);
 
     $sql = "
         select created, orderId, is_temporary, email
@@ -74,6 +76,7 @@ function identifyAbandonedCarts($fromDate, $toDate, $emailSubject) {
                             locate('</email>', data_text_1)-locate('<email>', data_text_1)-length('<email>')) as email
             from ezorder
             where created > $fromDate
+            and data_text_1 like '%<siteaccess>$encodedSiteAccess</siteaccess>%'
             group by is_temporary, email
         ) as carts
         where not exists (select 1 from mail_logs where  receivers=email and created > $fromDate and subject like '$encodedSubject')
