@@ -76,7 +76,6 @@ function identifyAbandonedCarts($fromDate, $toDate, $emailSubject, $siteAccess) 
                             locate('</email>', data_text_1)-locate('<email>', data_text_1)-length('<email>')) as email
             from ezorder
             where created > $fromDate
-            and data_text_1 like '%<siteaccess>$encodedSiteAccess</siteaccess>%'
             group by is_temporary, email
         ) as carts
         where not exists (select 1 from mail_logs where  receivers=email and created > $fromDate and subject like '$encodedSubject')
