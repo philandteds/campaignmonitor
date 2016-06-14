@@ -22,7 +22,6 @@ $apiKey = $ini->variable('General', 'APIKey');
 $clientId = $ini->variable('General', 'ClientID');
 
 $subject = 'Abandoned Cart';
-$siteAccess = $script->SiteAccess;
 
 
 // default values
@@ -34,7 +33,7 @@ if (!$dateRangeEnd)
 $fromDate = time() - ($dateRangeStart * SECONDS_IN_DAY);
 $toDate = time() - ($dateRangeEnd * SECONDS_IN_DAY);
 
-$abandonedCarts = identifyAbandonedCarts($fromDate, $toDate, $subject, $siteAccess);
+$abandonedCarts = identifyAbandonedCarts($fromDate, $toDate, $subject);
 foreach ($abandonedCarts as $email => $orderId) {
     $cli->notice("Abandoned cart detected: $email. Latest Order: $orderId");
 
@@ -63,11 +62,10 @@ if (!$cli->isQuiet()) {
  * @param $emailSubject string the Subject message to look for in the mail_logs table
  * @return array Map of the email addresses with abandoned carts & their order numbers (email address is the key, order number is the value)
  */
-function identifyAbandonedCarts($fromDate, $toDate, $emailSubject, $siteAccess) {
+function identifyAbandonedCarts($fromDate, $toDate, $emailSubject) {
     $db = eZDB::instance();
 
     $encodedSubject = $db->escapeString($emailSubject);
-    $encodedSiteAccess = $db->escapeString($siteAccess);
 
     $sql = "
         select created, orderId, is_temporary, email
@@ -116,19 +114,44 @@ function identifyAbandonedCarts($fromDate, $toDate, $emailSubject, $siteAccess) 
  */
 function sendAbandonedCartEmail($email, $orderId, $sender, $subject, $apiKey, $clientId, $cli) {
 
-    $tpl = eZTemplate::factory();
+    $originalSiteAccess = eZSiteAccess::current();
 
-    if ($orderId) {
-        $order = eZOrder::fetch( $orderId );
-        $tpl->setVariable( "order", $order );
+    if (!$orderId) {
+        $cli->error("Cannot find $orderId for $email");
+        return false;
     }
 
+    $order = eZOrder::fetch( $orderId );
+    $siteaccess = getSiteAccessForOrder($order);
+
+    if ($siteaccess) {
+        // switch to siteaccess of user in order to generate localized, internationalized, translated HTML
+        eZSiteAccess::load(
+            array( 'name' => $siteaccess,
+                   'type' => eZSiteAccess::TYPE_STATIC,
+                   'uri_part' => array()));
+    } else {
+        $cli->error("Cannot find a siteaccess for $orderId");
+        return false;
+    }
+
+    $tpl = eZTemplate::factory();
+    $tpl->setVariable( "order", $order );
+    $locale = getLocaleForSiteAccess($siteaccess);
+    $tpl->setVariable( "locale", $locale);
+
     $html = $tpl->fetch(EMAIL_TEMPLATE_NAME);
+    if (!$html) {
+        $cli->error("Could not render email for $email (siteaccess $siteaccess). This is probably because no design in that siteaccess includes " . EMAIL_TEMPLATE_NAME);
+        return false;
+    }
 
     if ($tpl->hasVariable("subject")) {
         $subject = $tpl->variable("subject");
     }
 
+    // revert back to original siteaccess
+    eZSiteAccess::load($originalSiteAccess);
 
     if (!$html) {
         $cli->notice("Error when rendering " . EMAIL_TEMPLATE_NAME . " . for email: $email. order ID: $orderId");
@@ -187,4 +210,47 @@ function logAbandonedCartEmailSend($email, $sender, $subject, $success) {
         'sender' => $sender));
 
     $logRecord->store();
+}
+
+
+/**
+ * Given an order, determine its siteaccess. Strangely, the accountInformation() call doesn't return this, so
+ * we extract it manually.
+ *
+ * @param order eZOrder order to inspect
+ * @return siteaccess name or false if it could not be determined
+ */
+function getSiteAccessForOrder($order) {
+
+    $xml = $order->attribute('data_text_1');
+    if (!$xml) {
+        return false;
+    }
+
+    $matches = array();
+    if (!preg_match("/<siteaccess>(.*)<\\/siteaccess>/", $xml, $matches)) {
+        return false;
+    }
+
+    return $matches[1];
+}
+
+/**
+ * Given a siteacess name, derive its locale string
+ *
+ * @param $siteaccess string name of the siteaccess
+ * @return string locale of the siteaccess, or null if it could not be determined
+ */
+function getLocaleForSiteAccess($siteaccesstoFind) {
+
+    $ini = eZIni::instance();
+    $languageSiteAccesses = $ini->variable('RegionalSettings', 'LanguageSA' );
+
+    // look for the language that references the siteaccess
+    foreach ($languageSiteAccesses as $locale => $siteaccess) {
+        if (trim($siteaccess) == $siteaccesstoFind) {
+            return $locale;
+        }
+    }
+    return false;
 }

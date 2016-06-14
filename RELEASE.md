@@ -24,9 +24,6 @@ The following parameters have been added to campaign_monitor.ini.append.php
 	# the age of the newest cart to report on (days)
 	DateRangeEndDays=1
 
-	# subject line of the abandoned cart email
-	EmailSubject=We'd love to have you back!
-
 	# email sender (make sure this user is allowed in Campaign Monitor)
 	EmailSender=no_reply@mountainbuggy.com
 
@@ -44,7 +41,7 @@ Testing the cronjob
 --------------------
 
 The following command may be used to test the cronjob (assuming the cronjob
-is defined in the [CronjobPart-test] part. To determine this, check in
+is defined in the [CronjobPart-test] part). To determine this, check in
 /extension/campaign_monitor/settings/cronjob.ini.append.php
 
     php runcronjobs.php -s mb_global test
@@ -60,22 +57,29 @@ The mail template is defined in
     design:shop/orderemail/html/abandoned_cart.tpl
 
 The default mail template is just a boring placeholder. Feel free to override
-it in the appropriate siteaccess. One parameter is passed in:
+it in the appropriate siteaccess. Two parameters are passed in:
 
       order => (eZOrder)
+      locale => (string)  eg. en-US
+
+For debugging, the default template echoes out the siteaccess inside HTML
+comments (view source to see them)
 
 To test the layout of the mail template, you can use a new view built for this
 purpose:
 
 http://dev.mountainbuggy.com/mb_global/campaign_monitor/preview_abandoned_cart_email/(OrderID)/2
 
-Note that you may see nothing if there is no email template for the siteaccess
-(in my case, I've added the campaign_monitor design to the mb_global siteaccess
-[AdditionalSiteDesigns] list, which lets me load the default mail template.
-You may or may not want to do that.)
+You'll need to edit your site.ini and add a site design that includes the
+ abandoned_cart.tpl file, or this view will show a blank page.
+
+If, for some reason, the template cannot be rendered during the cronjob running
+ (eg it is not defined for a siteaccess), a message will be printed on the
+ console and the email send will be skipped.
 
 Note that you'll need to grant permissions before you can see the view
 mentioned above.
+
 
 Indexing for speed
 ------------------
