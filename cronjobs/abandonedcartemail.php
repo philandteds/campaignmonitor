@@ -68,16 +68,16 @@ function identifyAbandonedCarts($fromDate, $toDate, $emailSubject) {
     $encodedSubject = $db->escapeString($emailSubject);
 
     $sql = "
-        select created, orderId, is_temporary, email
+        select created, orderId, is_temporary, tmp_email
         from (
             select max(created) as created, max(id) as orderId, is_temporary, substring(data_text_1, locate('<email>', data_text_1) + length('<email>'), 
-                            locate('</email>', data_text_1)-locate('<email>', data_text_1)-length('<email>')) as email
+                            locate('</email>', data_text_1)-locate('<email>', data_text_1)-length('<email>')) as tmp_email
             from ezorder
             where created > $fromDate
-            group by is_temporary, email
+            group by is_temporary, tmp_email
         ) as carts
-        where not exists (select 1 from mail_logs where  receivers=email and created > $fromDate and subject like '$encodedSubject')
-        order by email, is_temporary desc
+        where not exists (select 1 from mail_logs where  receivers=tmp_email and created > $fromDate and subject like '$encodedSubject')
+        order by tmp_email, is_temporary desc
 ";
 
     $rows = $db->arrayQuery($sql);
@@ -86,7 +86,7 @@ function identifyAbandonedCarts($fromDate, $toDate, $emailSubject) {
     foreach ($rows as $row) {
         $is_temporary = $row['is_temporary'];
         $created = $row['created'];
-        $email = strtolower($row['email']);
+        $email = strtolower($row['tmp_email']);
         $orderId = strtolower($row['orderId']);
 
         if ($is_temporary == 1 && $created > $fromDate && $created <= $toDate) {
