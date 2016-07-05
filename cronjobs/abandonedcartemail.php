@@ -37,8 +37,8 @@ $abandonedCarts = identifyAbandonedCarts($fromDate, $toDate, $subject);
 foreach ($abandonedCarts as $email => $orderId) {
     $cli->notice("Abandoned cart detected: $email. Latest Order: $orderId");
 
-    sendAbandonedCartEmail($email, $orderId, $sender, $subject, $apiKey, $clientId, $cli);
-    logAbandonedCartEmailSend($email, $sender, $subject, true);
+    $sendResponse = sendAbandonedCartEmail($email, $orderId, $sender, $subject, $apiKey, $clientId, $cli);
+    if( $sendResponse ) logAbandonedCartEmailSend($email, $sender, $subject, true);
 }
 
 if (!$cli->isQuiet()) {
@@ -130,10 +130,14 @@ function sendAbandonedCartEmail($email, $orderId, $sender, $subject, $apiKey, $c
             array( 'name' => $siteaccess,
                    'type' => eZSiteAccess::TYPE_STATIC,
                    'uri_part' => array()));
+        $cli->notice("Switched to siteaccess $siteaccess");
     } else {
         $cli->error("Cannot find a siteaccess for $orderId");
         return false;
     }
+
+    $cm_ini = eZINI::instance('campaign_monitor.ini');
+    if($cm_ini->variable('AbandonedCartEmail', 'SendEmail') != 'enabled') return false;
 
     $tpl = eZTemplate::factory();
     $tpl->setVariable( "order", $order );
