@@ -33,11 +33,18 @@ if (!$dateRangeEnd)
 $fromDate = time() - ($dateRangeStart * SECONDS_IN_DAY);
 $toDate = time() - ($dateRangeEnd * SECONDS_IN_DAY);
 
+$originalSiteAccess = eZSiteAccess::current();
+
 $abandonedCarts = identifyAbandonedCarts($fromDate, $toDate, $subject);
 foreach ($abandonedCarts as $email => $orderId) {
     $cli->notice("Abandoned cart detected: $email. Latest Order: $orderId");
 
     $sendResponse = sendAbandonedCartEmail($email, $orderId, $sender, $subject, $apiKey, $clientId, $cli);
+
+    // revert back to original siteaccess
+    eZSiteAccess::load($originalSiteAccess);
+
+
     if( $sendResponse ) logAbandonedCartEmailSend($email, $sender, $subject, true);
 }
 
@@ -114,7 +121,6 @@ function identifyAbandonedCarts($fromDate, $toDate, $emailSubject) {
  */
 function sendAbandonedCartEmail($email, $orderId, $sender, $subject, $apiKey, $clientId, $cli) {
 
-    $originalSiteAccess = eZSiteAccess::current();
 
     if (!$orderId) {
         $cli->error("Cannot find $orderId for $email");
@@ -137,8 +143,12 @@ function sendAbandonedCartEmail($email, $orderId, $sender, $subject, $apiKey, $c
     }
 
     $cm_ini = eZINI::instance('campaign_monitor.ini');
-    if($cm_ini->variable('AbandonedCartEmail', 'SendEmail') != 'enabled') return false;
+    if($cm_ini->variable('AbandonedCartEmail', 'SendEmail') != 'enabled') {
+        $cli->notice("Send for this siteaccess disabled in campaign_monitor.ini");
+        return false;
+    }
 
+    eZTemplate::resetInstance();
     $tpl = eZTemplate::factory();
     $tpl->setVariable( "order", $order );
     $locale = getLocaleForSiteAccess($siteaccess);
@@ -154,9 +164,6 @@ function sendAbandonedCartEmail($email, $orderId, $sender, $subject, $apiKey, $c
         $subject = $tpl->variable("subject");
     }
 
-    // revert back to original siteaccess
-    eZSiteAccess::load($originalSiteAccess);
-
     if (!$html) {
         $cli->notice("Error when rendering " . EMAIL_TEMPLATE_NAME . " . for email: $email. order ID: $orderId");
         return false;
@@ -165,7 +172,6 @@ function sendAbandonedCartEmail($email, $orderId, $sender, $subject, $apiKey, $c
     if (!$cli->isQuiet()) {
         $cli->notice("Sending Abandoned Cart Email to $email. Order ID: $orderId");
     }
-
 
     $message = array(
         'From' => $sender,
@@ -180,7 +186,7 @@ function sendAbandonedCartEmail($email, $orderId, $sender, $subject, $apiKey, $c
         'Text' => null, // let campaign monitor autogenerate the text part from the HTML
         'Attachments' => null
     );
-
+    
     // send
     $campaignMonitorAPI = new CS_REST_Transactional_ClassicEmail($apiKey);
     $campaignMonitorAPI->set_client($clientId);
