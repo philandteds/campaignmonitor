@@ -68,7 +68,7 @@ comments (view source to see them)
 To test the layout of the mail template, you can use a new view built for this
 purpose:
 
-http://dev.mountainbuggy.com/mb_global/campaign_monitor/preview_abandoned_cart_email/(OrderID)/2
+http://dev.mountainbuggy.com/mb_global/campaign_monitor/preview_abandoned_cart_email/2 (2 is the OrderID)
 
 You'll need to edit your site.ini and add a site design that includes the
  abandoned_cart.tpl file, or this view will show a blank page.
