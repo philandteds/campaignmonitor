@@ -36,6 +36,7 @@ $toDate = time() - ($dateRangeEnd * SECONDS_IN_DAY);
 $originalSiteAccess = eZSiteAccess::current();
 
 $abandonedCarts = identifyAbandonedCarts($fromDate, $toDate, $subject);
+
 foreach ($abandonedCarts as $email => $orderId) {
     $cli->notice("Abandoned cart detected: $email. Latest Order: $orderId");
 
@@ -85,7 +86,7 @@ function identifyAbandonedCarts($fromDate, $toDate, $emailSubject) {
         ) as carts
         where not exists (select 1 from mail_logs where  receivers=tmp_email and created > $fromDate and subject like '$encodedSubject')
         order by tmp_email, is_temporary desc
-";
+        ";
 
     $rows = $db->arrayQuery($sql);
     $candidateCarts = array();
@@ -129,6 +130,11 @@ function sendAbandonedCartEmail($email, $orderId, $sender, $subject, $apiKey, $c
 
     $order = eZOrder::fetch( $orderId );
     $siteaccess = getSiteAccessForOrder($order);
+    $SAarray = explode('_', $siteaccess);
+    if (in_array($SAarray[1], array('ca-en','ca-fr'))){
+        $cli->error("Canadian order $orderId - skip email");
+        return false;
+    }
 
     if ($siteaccess) {
         // switch to siteaccess of user in order to generate localized, internationalized, translated HTML
